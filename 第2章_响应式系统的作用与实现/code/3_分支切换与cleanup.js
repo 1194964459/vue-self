@@ -1,23 +1,42 @@
-/**
- * 在“1_响应式数据基本实现.js”中有几点可以优化的：
- * 1. 副作用函数(effect)是硬编码，一旦名字写错，上述代码就工作不了了 
- *     => 采用“注册副作用函数”机制
- *     => 这样，不管副作用是匿名函数，还是别的，都能正常工作
- * 2. 针对特定属性，与副作用函数间建立联系，而不是所有属性中任何一个修改了  都要重新执行一次副作用函数。
- */
-
-// TODO:痛点1. 用一个全局变量存储被注册的副作用函数
+// 用一个全局变量存储被注册的副作用函数
 let activeEffect
 
 /**
- * effect 函数用于注册副作用函数
+ * effect 函数用于注册副作用函数，同时收集依赖  看哪些属性值依赖当前的副作用函数
+ * 副作用函数执行前需要清除之前所有的依赖，执行后再重建最新的依赖...
+ * 
+ * 关键点：effectFn.deps，cleanup()
  * @param {*} fn 
  */
 function effect(fn) {
-    // 当调用 effect 注册副作用函数时，将副作用函数 fn 赋值给 activeEffect
-    activeEffect = fn
-    // 执行副作用函数
-    fn()
+    // TODO:新增1
+    const effectFn = () => {
+        // 调用 cleanup 函数完成清除工作
+        cleanup(effectFn)
+        activeEffect = effectFn
+        fn()
+    }
+    effectFn.deps = []
+    effectFn()
+}
+
+///------
+/**
+ * 每次副作用函数执行时，根据 effectFn.deps 获取所有相关联的依赖集合，进而将副作用函数从依赖集合中移除
+ * @param {*} effectFn 
+ */
+function cleanup(effectFn) {
+    console.log('清理前的：', effectFn.deps)
+    // 遍历 effectFn.deps 数组
+    for (let i = 0; i < effectFn.deps.length; i++) {
+        // deps 是依赖集合
+        const deps = effectFn.deps[i]
+        // 将 effectFn 从依赖集合中移除
+        deps.delete(effectFn)
+    }
+    // 最后需要重置 effectFn.deps 数组
+    effectFn.deps.length = 0
+    console.log('清理后的：', effectFn.deps)
 }
 
 // const data = { text: 'hello world' }
@@ -63,6 +82,7 @@ function track(target, key) {
         depsMap.set(key, (deps = new Set()))
     }
     deps.add(activeEffect)
+    activeEffect.deps.push(deps)
 }
 
 /**
@@ -75,19 +95,21 @@ function trigger(target, key) {
     const depsMap = bucket.get(target)
     if (!depsMap) return
     const effects = depsMap.get(key)
-    effects && effects.forEach(fn => fn())
-}
 
+    // TODO:变更
+    const effectsToRun = new Set(effects)  // 新增
+    effectsToRun.forEach(effectFn => effectFn())  // 新增
+    // effects && effects.forEach(fn => fn()) // 删除
+}
 
 effect(
     // 匿名副作用函数
     () => {
-        console.log('effect run')
+        console.log('effect run') // 会打印 2 次
         document.body.innerText = obj.ok ? obj.text : 'not'
     }
 )
 
 setTimeout(() => {
-    // obj.text = 'hello vue3'
     obj.ok = false
 }, 1000)

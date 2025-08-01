@@ -25,7 +25,9 @@ const obj = new Proxy(data, {
 
 
 
-// 副作用函数
+/**
+ * 副作用函数
+ */
 function effect() {
     document.body.innerText = obj.text
 }
