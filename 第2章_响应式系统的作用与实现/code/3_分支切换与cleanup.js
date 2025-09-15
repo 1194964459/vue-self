@@ -20,7 +20,6 @@ function effect(fn) {
     effectFn()
 }
 
-///------
 /**
  * 每次副作用函数执行时，根据 effectFn.deps 获取所有相关联的依赖集合，进而将副作用函数从依赖集合中移除
  * @param {*} effectFn 
@@ -29,12 +28,13 @@ function cleanup(effectFn) {
     console.log('清理前的：', effectFn.deps)
     // 遍历 effectFn.deps 数组
     for (let i = 0; i < effectFn.deps.length; i++) {
-        // deps 是依赖集合
+        // deps 是依赖集合  TODO:这里的deps是Bucket中每个key对应的set；改变这里相当于修改了Bucket中每个属性值对应的set
         const deps = effectFn.deps[i]
         // 将 effectFn 从依赖集合中移除
         deps.delete(effectFn)
     }
-    // 最后需要重置 effectFn.deps 数组
+    // 最后需要重置 effectFn.deps 数组  TODO:这里是必要的，上述代码运行后是：[Set(0),Set(0)]，
+    // 尽管Set的长度为空，但是数组长度并没修改；反观 Bucket 是没这个操作的，不过这样更好，正好省的新建Set
     effectFn.deps.length = 0
     console.log('清理后的：', effectFn.deps)
 }
@@ -96,7 +96,7 @@ function trigger(target, key) {
     if (!depsMap) return
     const effects = depsMap.get(key)
 
-    // TODO:变更
+    // TODO:变更，避免无限递归！
     const effectsToRun = new Set(effects)  // 新增
     effectsToRun.forEach(effectFn => effectFn())  // 新增
     // effects && effects.forEach(fn => fn()) // 删除

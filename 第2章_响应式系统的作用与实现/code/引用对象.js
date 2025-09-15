@@ -8,3 +8,11 @@ let a = { b }
 console.log(a)  // { b: { xx: '1' } }
 b.xx = '2'
 console.log(a)   // { b: { xx: '2' } }
+
+
+let c = function () {
+    console.log('11')
+}
+
+let d = c
+console.log(d === c)   // true

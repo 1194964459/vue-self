@@ -30,5 +30,11 @@ console.log(newSet == set)  // false
 newSet.forEach(item => {
     set.delete(1)
     set.add(1)
+    set.add(2)
     console.log('遍历中')
 })
+console.log('set:', set)
+console.log('newSet:', newSet)
+
+// set: Set(2) { 1, 2 }
+// newSet: Set(1) { 1 }
