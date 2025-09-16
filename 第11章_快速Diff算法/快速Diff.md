@@ -45,7 +45,7 @@ function patchKeyedChildren(n1, n2, container) {
 
   // TODO:更新相同的后置节点
   // 索引 oldEnd 指向旧的一组子节点的最后一个节点
-  let oldEnd = oldChildren.length -
+  let oldEnd = oldChildren.length - 1
   // 索引 newEnd 指向新的一组子节点的最后一个节点
   let newEnd = newChildren.length - 1
   oldVNode = oldChildren[oldEnd]
@@ -85,7 +85,8 @@ function patchKeyedChildren(n1, n2, container) {
   // 省略部分代码
   
   // 预处理完毕后，分别处理新增、删除
-  // 新增：则说明从 j --> newEnd 之间的节点应作为新节点插入
+
+  // 新增：旧节点处理完了(j > oldEnd)，新节点还有剩余（从 j -> newEnd 之间的节点应作为新节点插入）
   if (j > oldEnd && j <= newEnd) {
     // 锚点的索引
     const anchorIndex = newEnd + 1
@@ -97,7 +98,7 @@ function patchKeyedChildren(n1, n2, container) {
     }
   }
 
-   // 删除：
+   // 删除：新节点处理完了（j > newEnd），旧节点还有剩余！
    else if (j > newEnd && j <= oldEnd) {
     // j -> oldEnd 之间的节点应该被卸载
     while (j <= oldEnd) {
@@ -114,13 +115,13 @@ function patchKeyedChildren(n1, n2, container) {
 > 新的一组子节点：p-1、p-3、p-4、p-2、p-7、p-5。
 像这样的案例，无法通过简单的预处理过程完成更新。
 
-因此，所以接下来我们的任务就是，判断哪些节点需要移动，以及应该如何移动。
+因此，所以接下来我们的任务就是，判断哪些节点需要移动，以及应该如何移动？
 
 上述案例，当相同的前置节点和后置节点被处理完毕后，索引j、newEnd 和 oldEnd 不满足下面两个条件中的任何一个：
 * j > oldEnd && j <= newEnd
 * j > newEnd && j <= oldEnd
 
-因此，我们需要增加新的 else 分支来处理图 11-17 所示
+因此，我们需要增加新的 else 分支来处理
 
 ### 2. 特殊情况处理
 1. 需要构造一个数组 **source：**
@@ -157,7 +158,7 @@ if (j > oldEnd && j <= newEnd) {
     keyIndex[newChildren[i].key] = i
   }
 
-  // 遍历旧的一组子节点中剩余未处理的节点
+  // 遍历旧的一组子节点中剩余未处理的节点，并填充source数组
   for(let i = oldStart; i <= oldEnd; i++) {
     oldVNode = oldChildren[i]
     // 通过索引表快速找到新的一组子节点中具有相同 key 值的节点位置
@@ -178,7 +179,7 @@ if (j > oldEnd && j <= newEnd) {
 第二个 for 循环用来遍历旧的一组子节点。可以看到，我们**拿旧子节点的 key 值去索引表 keyIndex中查找该节点在新的一组子节点中的位置**，并将查找结果存储到变量 k 中。如果 k 存在，说明该节点是可复用的，所以我们调用 patch 函数进行打补丁，并填充source 数组；否则说明该节点已经不存在于新的一组子节点中了，这时我们需要调用 unmount 函数卸载它。
 
 ### 判断是否要移动？
-快速 Diff 算法判断节点是否需要移动的方法与*简单Diff 算法*类似，如果在遍历过程中遇到的**索引值呈现递增趋势，则说明不需要移动节点**，反之则需要。（注意，这里是新节点的索引值）
+快速 Diff 算法判断节点是否需要移动的方法与*简单Diff 算法*类似，如果在遍历过程中遇到的**索引值呈现递增趋势，则说明不需要移动节点**，反之则需要。（注意，这里是新节点在oldChild中的索引值）
 
 如下面的代码所示：
 ```js
@@ -186,7 +187,7 @@ if (j > oldEnd && j <= newEnd) {
 let moved = false  // 是否要移动？
 let pos = 0   // 遍历旧的一组子节点的过程中遇到的最大索引值 k
 
-// 判断节点是否需要移动, 其中k是oldChildren的遍历中获取，且新、旧节点同时出现的key; 具体参看下面的代码
+// 判断节点是否需要移动, 其中k是新节点在oldChildren的索引; 具体参看下面的代码
 if (k < pos) {    // pos是最大值，若在遍历过程中遇到比他小的则移动
     moved = true
 } else {
@@ -194,7 +195,7 @@ if (k < pos) {    // pos是最大值，若在遍历过程中遇到比他小的�
 }  
 ```
 
-我们还需要一**个数量标识，代表已经更新过的节点数量 patched**。我们知道，**已经更新过的节点数量应该小于新的一组子节点中需要更新的节点数量**。一旦前者超过后者，则说明有多余的节点，我们应该将它们卸载。
+我们还需要一**个数量标识，代表已经更新过的节点数量 patched**。我们知道，**已经更新过的节点数量应该小于新的一组子节点中 “总的需要更新的节点数量”**。一旦前者超过后者，则说明有多余的节点，我们应该将它们卸载。(TODO:这里好绕，如需要更新5个，当前更新了3个..)
 ```js
 // count: 总的要移动的节点数
 const count = newEnd - j +1
@@ -248,7 +249,7 @@ if (j > oldEnd && j <= newEnd) {
   }
 }
 ```
-## 三、如何移动
+## 三、如何移动?
 moved 若为 true，说明需要进行DOM 移动操作。
 ```js
 if (j > oldEnd && j <= newEnd) {
@@ -269,19 +270,42 @@ if (j > oldEnd && j <= newEnd) {
 ```js
 if (moved) {
   // 计算最长递增子序列
-  const seq = lis(sources) // [ 0, 1 ]
+  const seq = lis(sources) // source是[2,3,1,-1]，返回值是[0,1]（位置索引，不是值哦！）
 }
 ```
-注意📢： lis 函数的返回结果是最长递增子序列中的元素在source 数组中的位置索引。
+注意📢： lis 函数的返回结果是最长递增子序列中的元素在source 数组中的位置索引，lis返回的结果中对应的节点不需要移动。
 
-在编号时，我们忽略了经过预处理的节点。因此，需要重新编号。重新编号的含义是：在新的一组子节点中，重新编号后索引值为 0 和 1 的这两个节点在更新前后顺序没有发生变化。
+在编号时，我们忽略了经过预处理的节点。因此，需要重新编号。重新编号的含义是：在新的一组子节点中，重新编号后索引值为 0 和 1 的这两个节点在**更新前后顺序没有发生变化**。具体如下图所示：<br/><br/>
+![快速Diff](./icon/快速Diff.jpg)
 
-为了完成节点的移动，我们还需要创建两个索引值 i 和s：
-* 用索引 i 指向新的一组子节点 newChild 中的最后一个节点；  
-* 用索引 s 指向最长递增子序列 seq 中的最后一个元素。
+为了完成节点的移动，我们还需要创建两个索引值 i 和s，如下图所示：
+* 用索引 i 指向新的一组子节点 newChild 中的最后一个节点（**不含预处理后的节点**）；  
+* 用索引 s 指向最长递增子序列 seq 中的最后一个元素。 <br/>
 
-由于索引 i 是重新编号后的，因此为了得到真实索引值，我们需要计算表达式 i + newStart 的值。
+![快速Diff2](./icon/快速diff2.jpg) <br/>
 
+由于索引 i 是重新编号后的（下标0 从预处理后的节点开始），因此为了得到真实索引值，我们需要计算表达式 i + newStart 的值。  <br/>
+
+```js
+if (moved) {
+  const seq = lis(sources)
+  // s 指向最长递增子序列的最后一个元素
+  let s = seq.length - 1
+  let i = count - 1 // count是source数组的长度
+  for (i; i >= 0; i--) {
+    // 说明索引为 i 的节点是全新的节点，应该将其挂载
+    if (source[i] === -1) {}
+
+    // 说明该节点需要移动
+    else if (i !== seq[s]) {}
+    
+    // 当 i === seq[s] 时，说明该位置的节点不需要移动，并让 s 指向下一个位置
+    else{
+      s--
+    }
+  }
+}
+```
 完整代码如下：
 ```js
 if (moved) {
